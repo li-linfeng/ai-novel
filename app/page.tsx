@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -40,13 +40,15 @@ import {
 import { VersionHistory } from "@/components/version-history"
 import { QuickNotes } from "@/components/quick-notes"
 import { RichTextEditor } from "@/components/rich-text-editor"
+import { CreateProjectDialog } from "@/components/create-project-dialog"
+import { projectApi } from "@/lib/api"
 
 type Step = "creative" | "synopsis" | "outline" | "chapters" | "writing"
 type ProjectStatus = "draft" | "in-progress" | "completed" | "paused"
 type View = "dashboard" | "project"
 
 interface Project {
-  id: string
+  id: string  // 转换后的字符串ID，便于前端使用
   title: string
   genre: string
   status: ProjectStatus
@@ -54,6 +56,7 @@ interface Project {
   progress: number
   wordCount: number
   targetWords: number
+  description?: string
   lastModified: string
   createdAt: string
   completedSteps: Step[]
@@ -64,36 +67,72 @@ export default function AINovelPlatform() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [currentStep, setCurrentStep] = useState<Step>("creative")
   const [showVersionHistory, setShowVersionHistory] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Simplified mock data
-  const projects: Project[] = [
-    {
-      id: "1",
-      title: "时空守护者",
-      genre: "科幻",
-      status: "in-progress",
-      currentStep: "writing",
-      progress: 65,
-      wordCount: 45000,
-      targetWords: 250000,
-      lastModified: "2024-01-20 14:30",
-      createdAt: "2024-01-15",
-      completedSteps: ["creative", "synopsis", "outline", "chapters"],
-    },
-    {
-      id: "2",
-      title: "星际商人传奇",
-      genre: "太空歌剧",
-      status: "in-progress",
-      currentStep: "chapters",
-      progress: 40,
-      wordCount: 12000,
-      targetWords: 300000,
-      lastModified: "2024-01-19 09:15",
-      createdAt: "2024-01-18",
-      completedSteps: ["creative", "synopsis", "outline"],
-    },
-  ]
+  // 获取项目列表
+  const fetchProjects = async () => {
+    try {
+      setLoading(true)
+      const response = await projectApi.getProjects()
+      if (response.success && response.data) {
+        // 转换API数据格式到本地格式
+        const formattedProjects = response.data.map(project => ({
+          id: project.id.toString(),  // 将数字ID转换为字符串
+          title: project.title,
+          genre: project.genre,
+          status: project.status,
+          currentStep: project.current_step as Step,
+          progress: project.progress,
+          wordCount: project.word_count,
+          targetWords: project.target_words,
+          description: project.description,
+          lastModified: project.last_modified,
+          createdAt: project.created_at,
+          completedSteps: project.completed_steps as Step[]
+        }))
+        setProjects(formattedProjects)
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+      // 使用默认数据作为后备
+      setProjects([
+        {
+          id: "1",
+          title: "时空守护者",
+          genre: "科幻",
+          status: "in-progress",
+          currentStep: "writing",
+          progress: 65,
+          wordCount: 45000,
+          targetWords: 250000,
+          lastModified: "2024-01-20 14:30",
+          createdAt: "2024-01-15",
+          completedSteps: ["creative", "synopsis", "outline", "chapters"],
+        },
+        {
+          id: "2",
+          title: "星际商人传奇",
+          genre: "太空歌剧",
+          status: "in-progress",
+          currentStep: "chapters",
+          progress: 40,
+          wordCount: 12000,
+          targetWords: 300000,
+          lastModified: "2024-01-19 09:15",
+          createdAt: "2024-01-18",
+          completedSteps: ["creative", "synopsis", "outline"],
+        },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 页面初始化时获取项目列表
+  useEffect(() => {
+    fetchProjects()
+  }, [])
 
   const steps = [
     { id: "creative", title: "创意输入", icon: Lightbulb, description: "设定题材风格" },
@@ -114,29 +153,18 @@ export default function AINovelPlatform() {
     setSelectedProject(null)
   }
 
+  const handleCreateProject = async (projectData: { title: string; target_words: number; genre: string; description?: string }) => {
+    // 创建项目成功后，刷新项目列表
+    await fetchProjects()
+  }
+
   if (currentView === "dashboard") {
     return (
       <SimplifiedDashboard
         projects={projects}
+        loading={loading}
         onProjectSelect={handleProjectSelect}
-        onNewProject={() => {
-          const newProject: Project = {
-            id: Date.now().toString(),
-            title: "新项目",
-            genre: "",
-            status: "draft",
-            currentStep: "creative",
-            progress: 0,
-            wordCount: 0,
-            targetWords: 0,
-            lastModified: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            completedSteps: [],
-          }
-          setSelectedProject(newProject)
-          setCurrentStep("creative")
-          setCurrentView("project")
-        }}
+        onCreateProject={handleCreateProject}
       />
     )
   }
@@ -157,12 +185,14 @@ export default function AINovelPlatform() {
 // Simplified Dashboard
 function SimplifiedDashboard({
   projects,
+  loading,
   onProjectSelect,
-  onNewProject,
+  onCreateProject,
 }: {
   projects: Project[]
+  loading: boolean
   onProjectSelect: (project: Project) => void
-  onNewProject: () => void
+  onCreateProject: (projectData: { title: string; target_words: number; genre: string; description?: string }) => void
 }) {
   const [searchTerm, setSearchTerm] = useState("")
 
@@ -181,10 +211,7 @@ function SimplifiedDashboard({
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Button onClick={onNewProject} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              新建项目
-            </Button>
+            <CreateProjectDialog onCreateProject={onCreateProject} />
             <Button variant="outline" size="sm">
               <Settings className="h-4 w-4" />
             </Button>
@@ -214,22 +241,34 @@ function SimplifiedDashboard({
           </div>
 
           {/* Projects Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {filteredProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} onSelect={onProjectSelect} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">加载项目中...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {filteredProjects.map((project) => (
+                <ProjectCard key={project.id} project={project} onSelect={onProjectSelect} />
+              ))}
+            </div>
+          )}
 
           {/* Empty State */}
-          {filteredProjects.length === 0 && (
+          {!loading && filteredProjects.length === 0 && (
             <div className="text-center py-16">
               <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-medium text-gray-900 mb-2">还没有项目</h3>
               <p className="text-gray-600 mb-6">创建您的第一个小说项目，开始AI辅助创作</p>
-              <Button onClick={onNewProject} size="lg" className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-5 w-5 mr-2" />
-                创建第一个项目
-              </Button>
+              <CreateProjectDialog 
+                onCreateProject={onCreateProject}
+                trigger={
+                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="h-5 w-5 mr-2" />
+                    创建第一个项目
+                  </Button>
+                }
+              />
             </div>
           )}
         </div>
@@ -699,7 +738,7 @@ function CreativeInput() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {["穿越", "重生", "系统", "修仙", "都市", "校园", "职场", "悬疑", "推理", "科幻"].map((tag) => (
+                  {["玄幻", "仙侠", "武侠", "都市", "现实", "军事", "历史", "游戏", "体育", "科幻", "悬疑", "轻小说", "同人"].map((tag) => (
                     <Badge key={tag} variant="secondary" className="cursor-pointer hover:bg-blue-100">
                       {tag}
                     </Badge>
