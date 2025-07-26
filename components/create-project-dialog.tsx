@@ -47,7 +47,7 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
       try {
         const response = await projectApi.getProjectConfig()
         if (response.success && response.data) {
-          setGenres(response.data.genr || [])  // 使用 genr 字段而不是 genres
+          setGenres(response.data.genre || [])  // 使用 genre 字段
         }
       } catch (error) {
         console.error('Failed to fetch project config:', error)
@@ -86,7 +86,7 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
     }
     
     if (!formData.genre) {
-      newErrors.genre = "请选择项目风格"
+      newErrors.genre = "请选择题材"
     }
     
     if (formData.target_words < 1000) {
@@ -120,7 +120,7 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
           // 重置表单
           resetForm()
         } else {
-          // 显示API错误
+          // 显示后端返回的错误信息（4xx/5xx状态码的message）
           setErrors({ title: response.error || '创建项目失败' })
         }
       } catch (error) {
@@ -202,10 +202,10 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
             <p className="text-xs text-gray-500">建议：短篇小说 1-5万字，中篇小说 5-15万字，长篇小说 15万字以上</p>
           </div>
 
-          {/* 项目风格 */}
+          {/* 题材 */}
           <div className="space-y-2">
             <Label htmlFor="genre" className="text-sm font-medium">
-              项目风格 <span className="text-red-500">*</span>
+              题材 <span className="text-red-500">*</span>
             </Label>
             <Select
               value={formData.genre}
@@ -213,7 +213,7 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
               disabled={loading}
             >
               <SelectTrigger className={errors.genre ? "border-red-500" : ""}>
-                <SelectValue placeholder="请选择项目风格" />
+                <SelectValue placeholder="请选择题材" />
               </SelectTrigger>
               <SelectContent>
                 {genres.map((genre) => (

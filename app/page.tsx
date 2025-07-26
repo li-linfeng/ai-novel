@@ -92,6 +92,11 @@ export default function AINovelPlatform() {
           completedSteps: project.completed_steps as Step[]
         }))
         setProjects(formattedProjects)
+      } else {
+        // API调用失败，显示错误信息并使用默认数据
+        console.error('Failed to fetch projects:', response.error)
+        // 可以在这里添加用户友好的错误提示，比如toast通知
+        throw new Error(response.error || 'API返回失败状态')
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error)
@@ -948,7 +953,7 @@ function OutlineCreation() {
             <Card>
               <CardHeader>
                 <CardTitle>《时空守护者》- 故事大纲</CardTitle>
-                <CardDescription>科幻修仙 | 预计25万字 | 三幕式结构</CardDescription>
+                <CardDescription>2087年清晨，时空管理局总部的宏伟建筑，林晨怀着忐忑心情前来报到修仙 | 预计25万字 | 三幕式结构</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">

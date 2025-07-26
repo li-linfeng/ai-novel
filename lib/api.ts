@@ -24,7 +24,7 @@ export interface ProjectCreateData {
 }
 
 export interface ProjectConfig {
-  genr: string[]  // 注意：后端返回的字段名是 genr 而不是 genres
+  genre: string[]  // 后端返回的字段名是 genre
   [key: string]: any
 }
 
@@ -58,23 +58,32 @@ async function request<T = any>(
       ...options,
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    // 尝试解析JSON响应
+    let backendResponse: BackendResponse<T>
+    try {
+      backendResponse = await response.json()
+    } catch (parseError) {
+      // 如果响应不是JSON格式，创建一个默认的响应对象
+      const textResponse = await response.text()
+      backendResponse = {
+        code: response.status,
+        message: textResponse || `HTTP ${response.status} ${response.statusText}`
+      }
     }
 
-    const backendResponse: BackendResponse<T> = await response.json()
-    
-    // 将后端响应格式转换为前端统一格式
-    if (backendResponse.code === 200) {
+    // 基于HTTP状态码判断成功与否
+    if (response.ok) {
+      // 2xx状态码表示成功
       return {
         success: true,
         data: backendResponse.data,
         message: backendResponse.message
       }
     } else {
+      // 4xx和5xx状态码表示异常，弹出message信息
       return {
         success: false,
-        error: backendResponse.message || `请求失败，错误码: ${backendResponse.code}`
+        error: backendResponse.message || `请求失败，状态码: ${response.status}`
       }
     }
   } catch (error) {
