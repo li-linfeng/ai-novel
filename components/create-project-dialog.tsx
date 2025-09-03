@@ -10,10 +10,19 @@ import { Textarea } from "@/components/ui/textarea"
 import { Plus, Loader2 } from "lucide-react"
 import { projectApi, type ProjectCreateData } from "@/lib/api"
 
+interface GenreItem {
+  id: number
+  name: string
+  parent_id: number
+  children?: GenreItem[]
+}
+
 interface ProjectFormData {
   title: string
   target_words: number
-  genre: string
+  genre: string  // 保存选中的子类题材名称
+  genre_id?: number  // 保存选中的子类题材ID
+  parent_genre?: string  // 保存父类题材名称
   description?: string
 }
 
@@ -32,11 +41,14 @@ interface CreateProjectDialogProps {
 export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [genres, setGenres] = useState<string[]>([])
+  const [genres, setGenres] = useState<GenreItem[]>([])
+  const [selectedParentGenre, setSelectedParentGenre] = useState<string>("")
   const [formData, setFormData] = useState<ProjectFormData>({
     title: "",
     target_words: 100000,
     genre: "",
+    genre_id: undefined,
+    parent_genre: undefined,
     description: ""
   })
   const [errors, setErrors] = useState<ProjectFormErrors>({})
@@ -45,28 +57,39 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
   useEffect(() => {
     const fetchConfig = async () => {
       try {
+        setLoading(true)
         const response = await projectApi.getProjectConfig()
-        if (response.success && response.data) {
-          setGenres(response.data.genre || [])  // 使用 genre 字段
+        if (response.success && response.data?.genre && Array.isArray(response.data.genre)) {
+          const genreData = response.data.genre as GenreItem[]
+          if (genreData.every(item => 
+            typeof item === 'object' && 
+            'id' in item && 
+            'name' in item && 
+            'parent_id' in item
+          )) {
+            setGenres(genreData)
+            // 重置选择
+            setSelectedParentGenre("")
+            setFormData(prev => ({
+              ...prev,
+              genre: "",
+              genre_id: undefined,
+              parent_genre: undefined
+            }))
+          } else {
+            throw new Error('题材数据格式不正确')
+          }
+        } else {
+          throw new Error(response.error || '获取题材列表失败')
         }
       } catch (error) {
         console.error('Failed to fetch project config:', error)
-        // 使用默认题材选项作为后备，与后端返回的题材保持一致
-        setGenres([
-          "玄幻",
-          "仙侠",
-          "武侠",
-          "都市",
-          "现实",
-          "军事",
-          "历史",
-          "游戏",
-          "体育",
-          "科幻",
-          "悬疑",
-          "轻小说",
-          "同人"
-        ])
+        setErrors(prev => ({
+          ...prev,
+          genre: error instanceof Error ? error.message : '获取题材列表失败'
+        }))
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -85,8 +108,10 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
       newErrors.title = "项目名称不能为空"
     }
     
-    if (!formData.genre) {
-      newErrors.genre = "请选择题材"
+    if (!selectedParentGenre) {
+      newErrors.genre = "请选择主题材"
+    } else if (!formData.genre) {
+      newErrors.genre = "请选择子题材"
     }
     
     if (formData.target_words < 1000) {
@@ -133,10 +158,13 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
   }
 
   const resetForm = () => {
+    setSelectedParentGenre("")
     setFormData({
       title: "",
       target_words: 100000,
       genre: "",
+      genre_id: undefined,
+      parent_genre: undefined,
       description: ""
     })
     setErrors({})
@@ -202,27 +230,89 @@ export function CreateProjectDialog({ onCreateProject, trigger }: CreateProjectD
             <p className="text-xs text-gray-500">建议：短篇小说 1-5万字，中篇小说 5-15万字，长篇小说 15万字以上</p>
           </div>
 
-          {/* 题材 */}
-          <div className="space-y-2">
-            <Label htmlFor="genre" className="text-sm font-medium">
-              题材 <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.genre}
-              onValueChange={(value) => setFormData({ ...formData, genre: value })}
-              disabled={loading}
-            >
-              <SelectTrigger className={errors.genre ? "border-red-500" : ""}>
-                <SelectValue placeholder="请选择题材" />
-              </SelectTrigger>
-              <SelectContent>
-                {genres.map((genre) => (
-                  <SelectItem key={genre} value={genre}>
-                    {genre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* 题材选择（两级） */}
+          <div className="space-y-4">
+            {/* 主题材 */}
+            <div className="space-y-2">
+              <Label htmlFor="parent-genre" className="text-sm font-medium">
+                主题材 <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={selectedParentGenre}
+                onValueChange={(value) => {
+                  setSelectedParentGenre(value)
+                  setFormData(prev => ({
+                    ...prev,
+                    genre: "",
+                    genre_id: undefined,
+                    parent_genre: value
+                  }))
+                }}
+                disabled={loading}
+              >
+                <SelectTrigger 
+                  className={`${errors.genre ? "border-red-500" : ""} ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <SelectValue placeholder={loading ? "加载中..." : "请选择主题材"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {genres.length > 0 ? (
+                    genres.map((genre) => (
+                      <SelectItem key={genre.id} value={genre.name}>
+                        {genre.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-center text-gray-500">
+                      {loading ? (
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          加载中...
+                        </div>
+                      ) : (
+                        "暂无可选题材"
+                      )}
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 子题材 */}
+            {selectedParentGenre && (
+              <div className="space-y-2">
+                <Label htmlFor="sub-genre" className="text-sm font-medium">
+                  子题材 <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.genre}
+                  onValueChange={(value) => {
+                    const parentGenre = genres.find(g => g.name === selectedParentGenre)
+                    const subGenre = parentGenre?.children?.find(c => c.name === value)
+                    setFormData(prev => ({
+                      ...prev,
+                      genre: value,
+                      genre_id: subGenre?.id
+                    }))
+                  }}
+                  disabled={loading}
+                >
+                  <SelectTrigger 
+                    className={`${errors.genre ? "border-red-500" : ""} ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <SelectValue placeholder="请选择子题材" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {genres.find(g => g.name === selectedParentGenre)?.children?.map((subGenre) => (
+                      <SelectItem key={subGenre.id} value={subGenre.name}>
+                        {subGenre.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
             {errors.genre && <p className="text-sm text-red-500">{errors.genre}</p>}
           </div>
 

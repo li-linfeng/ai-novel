@@ -597,6 +597,67 @@ function OptimizedWorkspace({
 
 // Complete step components
 function CreativeInput() {
+  // 添加状态管理
+  const [isLoading, setIsLoading] = useState(false);
+  const [tags, setTags] = useState<{label: string, value: string}[]>([]);
+  const [styles, setStyles] = useState<any[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedStyle, setSelectedStyle] = useState<string>("");
+  const [styleDetails, setStyleDetails] = useState<any>(null);
+  const [tagSearchTerm, setTagSearchTerm] = useState("");
+  
+  // 从后端获取标签和写作风格数据
+  useEffect(() => {
+    const fetchCreativeData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/synopsis/create");
+        const data = await response.json();
+        
+        if (data.tags && Array.isArray(data.tags)) {
+          setTags(data.tags);
+        }
+        
+        if (data.styles && Array.isArray(data.styles)) {
+          setStyles(data.styles);
+        }
+      } catch (error) {
+        console.error("获取创意数据失败:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCreativeData();
+  }, []);
+  
+  // 处理写作风格选择
+  const handleStyleChange = (value: string) => {
+    setSelectedStyle(value);
+    const selectedStyleDetails = styles.find(style => style.value === value);
+    setStyleDetails(selectedStyleDetails);
+  };
+  
+  // 处理标签选择
+  const handleTagSelect = (tag: string) => {
+    if (!selectedTags.includes(tag)) {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+  
+  // 处理标签移除
+  const handleTagRemove = (tag: string) => {
+    setSelectedTags(selectedTags.filter(t => t !== tag));
+  };
+  
+  // 过滤标签
+  const filteredTags = tags
+    .filter(tag => tag.label.toLowerCase().includes(tagSearchTerm.toLowerCase()))
+    .slice(0, 20); // 限制显示数量
+  
+  // 热门标签（示例）
+  const popularTags = ["穿越", "重生", "系统流", "修仙", "都市", "无敌文"];
+  
   return (
     <div className="h-full p-8 overflow-y-auto">
       <div className="max-w-4xl mx-auto">
@@ -648,34 +709,132 @@ function CreativeInput() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  {/* 标签选择 */}
                   <div>
-                    <Label htmlFor="length">目标字数</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择字数" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="short">短篇 (1-5万字)</SelectItem>
-                        <SelectItem value="medium">中篇 (5-15万字)</SelectItem>
-                        <SelectItem value="long">长篇 (15-50万字)</SelectItem>
-                        <SelectItem value="series">系列 (50万字+)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="tags">标签选择</Label>
+                    <div className="mt-2">
+                      {/* 已选择的标签 */}
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {selectedTags.length > 0 ? (
+                          selectedTags.map((tag) => (
+                            <Badge key={tag} className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                              {tag} 
+                              <span 
+                                className="ml-1 cursor-pointer" 
+                                onClick={() => handleTagRemove(tag)}
+                              >
+                                ×
+                              </span>
+                            </Badge>
+                          ))
+                        ) : (
+                          <div className="text-sm text-gray-500">未选择任何标签</div>
+                        )}
+                      </div>
+                      
+                      {/* 标签搜索 */}
+                      <div className="relative">
+                        <Input 
+                          placeholder="搜索或选择标签..." 
+                          value={tagSearchTerm}
+                          onChange={(e) => setTagSearchTerm(e.target.value)}
+                        />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="absolute right-0 top-0 h-full"
+                          onClick={() => setTagSearchTerm("")}
+                        >
+                          {tagSearchTerm ? (
+                            <span className="text-gray-400">×</span>
+                          ) : (
+                            <Search className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      
+                      {/* 搜索结果 */}
+                      {tagSearchTerm && (
+                        <div className="mt-2 p-2 border rounded-md max-h-40 overflow-y-auto">
+                          {isLoading ? (
+                            <div className="text-center py-2">加载中...</div>
+                          ) : filteredTags.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {filteredTags.map((tag) => (
+                                <Badge 
+                                  key={tag.value} 
+                                  variant="outline" 
+                                  className="cursor-pointer hover:bg-gray-100"
+                                  onClick={() => handleTagSelect(tag.label)}
+                                >
+                                  {tag.label}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-2 text-sm text-gray-500">未找到匹配的标签</div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="mt-2 text-xs text-gray-500">
+                        从后端获取的标签列表，可多选。点击下方热门标签快速添加
+                      </div>
+                      
+                      {/* 热门标签 */}
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {popularTags.map((tag) => (
+                          <Badge 
+                            key={tag} 
+                            variant="outline" 
+                            className={`cursor-pointer ${selectedTags.includes(tag) ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                            onClick={() => handleTagSelect(tag)}
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* 写作风格 */}
                   <div>
-                    <Label htmlFor="audience">目标读者</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择读者群体" />
+                    <Label htmlFor="writing-style">写作风格</Label>
+                    <Select value={selectedStyle} onValueChange={handleStyleChange}>
+                      <SelectTrigger className={isLoading ? "opacity-70" : ""}>
+                        <SelectValue placeholder={isLoading ? "加载中..." : "选择写作风格"} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="young">青少年</SelectItem>
-                        <SelectItem value="adult">成年人</SelectItem>
-                        <SelectItem value="general">大众读者</SelectItem>
-                        <SelectItem value="literary">文学爱好者</SelectItem>
+                        {styles.map((style) => (
+                          <SelectItem key={style.value} value={style.value}>
+                            {style.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    
+                    {/* 风格详情 */}
+                    {styleDetails && (
+                      <div className="mt-2 p-3 bg-gray-50 rounded-md text-sm">
+                        <p className="font-medium mb-1">风格特点：</p>
+                        <ul className="list-disc list-inside text-gray-600 space-y-1">
+                          {styleDetails.characteristics.map((characteristic: string, index: number) => (
+                            <li key={index}>{characteristic}</li>
+                          ))}
+                        </ul>
+                        {styleDetails.applicable_genres && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            适用题材：{styleDetails.applicable_genres.join("、")}
+                          </p>
+                        )}
+                        {styleDetails.example && (
+                          <div className="mt-2 p-2 bg-white rounded border text-xs italic">
+                            示例：{styleDetails.example}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

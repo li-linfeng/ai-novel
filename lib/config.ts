@@ -1,7 +1,7 @@
 // API配置
 export const API_CONFIG = {
   BASE_URL: process.env.NODE_ENV === 'production' 
-    ? 'http://127.0.0.1:9502'  // 生产环境
+    ? 'http://127.0.0.1:9506'  // 生产环境
     : '/api',  // 开发环境使用代理
   ENDPOINTS: {
     PROJECTS: '/projects',
