@@ -100,35 +100,8 @@ export default function AINovelPlatform() {
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error)
-      // 使用默认数据作为后备
-      setProjects([
-        {
-          id: "1",
-          title: "时空守护者",
-          genre: "科幻",
-          status: "in-progress",
-          currentStep: "writing",
-          progress: 65,
-          wordCount: 45000,
-          targetWords: 250000,
-          lastModified: "2024-01-20 14:30",
-          createdAt: "2024-01-15",
-          completedSteps: ["creative", "synopsis", "outline", "chapters"],
-        },
-        {
-          id: "2",
-          title: "星际商人传奇",
-          genre: "太空歌剧",
-          status: "in-progress",
-          currentStep: "chapters",
-          progress: 40,
-          wordCount: 12000,
-          targetWords: 300000,
-          lastModified: "2024-01-19 09:15",
-          createdAt: "2024-01-18",
-          completedSteps: ["creative", "synopsis", "outline"],
-        },
-      ])
+      // 不使用默认数据，保持空列表
+      setProjects([])
     } finally {
       setLoading(false)
     }
@@ -601,10 +574,11 @@ function CreativeInput() {
   const [isLoading, setIsLoading] = useState(false);
   const [tags, setTags] = useState<{label: string, value: string}[]>([]);
   const [styles, setStyles] = useState<any[]>([]);
+  const [models, setModels] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedStyle, setSelectedStyle] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [styleDetails, setStyleDetails] = useState<any>(null);
-  const [tagSearchTerm, setTagSearchTerm] = useState("");
   
   // 从后端获取标签和写作风格数据
   useEffect(() => {
@@ -621,6 +595,10 @@ function CreativeInput() {
         if (data.styles && Array.isArray(data.styles)) {
           setStyles(data.styles);
         }
+        
+        if (data.models && Array.isArray(data.models)) {
+          setModels(data.models);
+        }
       } catch (error) {
         console.error("获取创意数据失败:", error);
       } finally {
@@ -630,13 +608,6 @@ function CreativeInput() {
     
     fetchCreativeData();
   }, []);
-  
-  // 处理写作风格选择
-  const handleStyleChange = (value: string) => {
-    setSelectedStyle(value);
-    const selectedStyleDetails = styles.find(style => style.value === value);
-    setStyleDetails(selectedStyleDetails);
-  };
   
   // 处理标签选择
   const handleTagSelect = (tag: string) => {
@@ -650,13 +621,20 @@ function CreativeInput() {
     setSelectedTags(selectedTags.filter(t => t !== tag));
   };
   
-  // 过滤标签
-  const filteredTags = tags
-    .filter(tag => tag.label.toLowerCase().includes(tagSearchTerm.toLowerCase()))
-    .slice(0, 20); // 限制显示数量
+  // 处理写作风格选择
+  const handleStyleChange = (value: string) => {
+    setSelectedStyle(value);
+    const selectedStyleDetails = styles.find(style => style.value === value);
+    setStyleDetails(selectedStyleDetails);
+  };
   
-  // 热门标签（示例）
-  const popularTags = ["穿越", "重生", "系统流", "修仙", "都市", "无敌文"];
+  // 处理模型选择
+  const handleModelChange = (value: string) => {
+    setSelectedModel(value);
+  };
+  
+  // 热门标签（从后端数据中筛选）
+  const popularTags = tags.slice(0, 6).map(tag => tag.label);
   
   return (
     <div className="h-full p-8 overflow-y-auto">
@@ -675,47 +653,33 @@ function CreativeInput() {
                 <CardDescription>选择小说的基本属性</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="genre">题材类型</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择题材" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="fantasy">奇幻</SelectItem>
-                        <SelectItem value="romance">言情</SelectItem>
-                        <SelectItem value="mystery">悬疑</SelectItem>
-                        <SelectItem value="scifi">科幻</SelectItem>
-                        <SelectItem value="historical">历史</SelectItem>
-                        <SelectItem value="urban">都市</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="style">写作风格</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择风格" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="classical">古典优雅</SelectItem>
-                        <SelectItem value="modern">现代简洁</SelectItem>
-                        <SelectItem value="humorous">幽默风趣</SelectItem>
-                        <SelectItem value="serious">严肃深刻</SelectItem>
-                        <SelectItem value="poetic">诗意浪漫</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* 写作模型选择 */}
+                <div>
+                  <Label htmlFor="writing-model">写作模型</Label>
+                  <Select value={selectedModel} onValueChange={handleModelChange}>
+                    <SelectTrigger className={isLoading ? "opacity-70" : ""}>
+                      <SelectValue placeholder={isLoading ? "加载中..." : "选择AI写作模型"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="mt-2 text-xs text-gray-500">
+                    选择用于生成故事内容的AI模型，不同模型有不同的写作特点
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   {/* 标签选择 */}
                   <div>
-                    <Label htmlFor="tags">标签选择</Label>
+                    <Label htmlFor="tags">标签选择（多选）</Label>
                     <div className="mt-2">
                       {/* 已选择的标签 */}
-                      <div className="flex flex-wrap gap-2 mb-2">
+                      <div className="flex flex-wrap gap-2 mb-4">
                         {selectedTags.length > 0 ? (
                           selectedTags.map((tag) => (
                             <Badge key={tag} className="bg-blue-100 text-blue-800 hover:bg-blue-200">
@@ -733,67 +697,68 @@ function CreativeInput() {
                         )}
                       </div>
                       
-                      {/* 标签搜索 */}
-                      <div className="relative">
-                        <Input 
-                          placeholder="搜索或选择标签..." 
-                          value={tagSearchTerm}
-                          onChange={(e) => setTagSearchTerm(e.target.value)}
-                        />
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="absolute right-0 top-0 h-full"
-                          onClick={() => setTagSearchTerm("")}
-                        >
-                          {tagSearchTerm ? (
-                            <span className="text-gray-400">×</span>
-                          ) : (
-                            <Search className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      
-                      {/* 搜索结果 */}
-                      {tagSearchTerm && (
-                        <div className="mt-2 p-2 border rounded-md max-h-40 overflow-y-auto">
-                          {isLoading ? (
-                            <div className="text-center py-2">加载中...</div>
-                          ) : filteredTags.length > 0 ? (
+                      {/* 所有标签分类展示 */}
+                      <div className="border rounded-md p-3">
+                        <h4 className="font-medium mb-2 text-sm">所有可选标签</h4>
+                        
+                        {isLoading ? (
+                          <div className="text-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                            <p className="mt-2 text-sm text-gray-500">加载标签中...</p>
+                          </div>
+                        ) : (
+                          <div className="max-h-60 overflow-y-auto pr-2">
                             <div className="flex flex-wrap gap-2">
-                              {filteredTags.map((tag) => (
+                              {tags.map((tag) => (
                                 <Badge 
                                   key={tag.value} 
-                                  variant="outline" 
-                                  className="cursor-pointer hover:bg-gray-100"
-                                  onClick={() => handleTagSelect(tag.label)}
+                                  variant={selectedTags.includes(tag.label) ? "default" : "outline"}
+                                  className={`cursor-pointer ${
+                                    selectedTags.includes(tag.label) 
+                                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
+                                      : 'hover:bg-gray-100'
+                                  }`}
+                                  onClick={() => 
+                                    selectedTags.includes(tag.label) 
+                                      ? handleTagRemove(tag.label) 
+                                      : handleTagSelect(tag.label)
+                                  }
                                 >
                                   {tag.label}
                                 </Badge>
                               ))}
                             </div>
-                          ) : (
-                            <div className="text-center py-2 text-sm text-gray-500">未找到匹配的标签</div>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
                       
-                      <div className="mt-2 text-xs text-gray-500">
-                        从后端获取的标签列表，可多选。点击下方热门标签快速添加
+                      <div className="mt-3 text-xs text-gray-500">
+                        点击标签进行选择或取消选择，可多选
                       </div>
                       
                       {/* 热门标签 */}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {popularTags.map((tag) => (
-                          <Badge 
-                            key={tag} 
-                            variant="outline" 
-                            className={`cursor-pointer ${selectedTags.includes(tag) ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
-                            onClick={() => handleTagSelect(tag)}
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
+                      <div className="mt-3">
+                        <h4 className="text-sm font-medium mb-2">热门标签</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {popularTags.map((tag) => (
+                            <Badge 
+                              key={tag} 
+                              variant={selectedTags.includes(tag) ? "default" : "outline"}
+                              className={`cursor-pointer ${
+                                selectedTags.includes(tag) 
+                                  ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
+                                  : 'hover:bg-gray-100'
+                              }`}
+                              onClick={() => 
+                                selectedTags.includes(tag) 
+                                  ? handleTagRemove(tag) 
+                                  : handleTagSelect(tag)
+                              }
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -845,30 +810,17 @@ function CreativeInput() {
                 <CardTitle>创作想法</CardTitle>
                 <CardDescription>详细描述您的创作灵感和想法</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 <div>
-                  <Label htmlFor="concept">核心概念</Label>
+                  <Label htmlFor="creative-idea">创作想法</Label>
                   <Textarea
-                    id="concept"
-                    placeholder="描述您小说的核心概念、主题或独特之处..."
-                    className="min-h-[100px]"
+                    id="creative-idea"
+                    placeholder="请详细描述您的创作想法，包括故事概念、主要角色、故事背景、灵感来源等..."
+                    className="min-h-[200px] mt-2"
                   />
-                </div>
-                <div>
-                  <Label htmlFor="characters">主要角色</Label>
-                  <Textarea
-                    id="characters"
-                    placeholder="简单描述主要角色的性格、背景或特点..."
-                    className="min-h-[80px]"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="setting">故事背景</Label>
-                  <Textarea id="setting" placeholder="描述故事发生的时代、地点、世界观..." className="min-h-[80px]" />
-                </div>
-                <div>
-                  <Label htmlFor="inspiration">灵感来源</Label>
-                  <Textarea id="inspiration" placeholder="分享触发这个创意的灵感来源..." className="min-h-[60px]" />
+                  <div className="mt-2 text-xs text-gray-500">
+                    提示：您可以描述故事的核心概念、主要角色特点、故事背景设定、灵感来源等任何有助于AI理解您创意的内容
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -943,35 +895,8 @@ function CreativeInput() {
 }
 
 function SynopsisGeneration() {
-  const synopses = [
-    {
-      id: 1,
-      title: "时空守护者",
-      summary:
-        "在2087年的未来世界，时空管理局的新人守护者林晨意外发现了一个时空裂缝，这个裂缝连接着古代的修仙世界。当两个世界的命运交织在一起时，林晨必须在科技与修仙之间找到平衡，阻止即将到来的时空崩塌。",
-      themes: ["科幻", "修仙", "时空穿越"],
-      tone: "紧张刺激",
-      length: "预计25万字",
-    },
-    {
-      id: 2,
-      title: "星际商人传奇",
-      summary:
-        "在银河系边缘的贸易站，年轻的商人艾莉亚继承了祖父的星际货船。然而，她很快发现这艘船隐藏着一个古老的秘密——它是通往失落文明的钥匙。在追求财富与探索未知之间，艾莉亚将开启一段改变银河系格局的冒险。",
-      themes: ["太空歌剧", "冒险", "商业"],
-      tone: "轻松幽默",
-      length: "预计30万字",
-    },
-    {
-      id: 3,
-      title: "数字世界的守望者",
-      summary:
-        "在虚拟现实技术高度发达的2090年，程序员陈墨发现自己可以在数字世界中获得超能力。当现实与虚拟的界限开始模糊，一个神秘的AI开始威胁两个世界的存在时，陈墨必须成为连接两个世界的桥梁。",
-      themes: ["赛博朋克", "AI", "虚拟现实"],
-      tone: "深沉思辨",
-      length: "预计20万字",
-    },
-  ]
+  const [synopses, setSynopses] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   return (
     <div className="h-full p-8 overflow-y-auto">
@@ -981,44 +906,57 @@ function SynopsisGeneration() {
           <p className="text-gray-600">AI已为您生成多个故事梗概，请选择最符合您创意的版本</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-          {synopses.map((synopsis) => (
-            <Card
-              key={synopsis.id}
-              className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-300"
-            >
-              <CardHeader>
-                <CardTitle className="text-xl">{synopsis.title}</CardTitle>
-                <div className="flex flex-wrap gap-2">
-                  {synopsis.themes.map((theme) => (
-                    <Badge key={theme} variant="secondary">
-                      {theme}
-                    </Badge>
-                  ))}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-700 mb-4 leading-relaxed">{synopsis.summary}</p>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div>
-                    <strong>风格:</strong> {synopsis.tone}
+        {synopses.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+            {synopses.map((synopsis) => (
+              <Card
+                key={synopsis.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-300"
+              >
+                <CardHeader>
+                  <CardTitle className="text-xl">{synopsis.title}</CardTitle>
+                  <div className="flex flex-wrap gap-2">
+                    {synopsis.themes?.map((theme: string) => (
+                      <Badge key={theme} variant="secondary">
+                        {theme}
+                      </Badge>
+                    ))}
                   </div>
-                  <div>
-                    <strong>篇幅:</strong> {synopsis.length}
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-700 mb-4 leading-relaxed">{synopsis.summary}</p>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div>
+                      <strong>风格:</strong> {synopsis.tone}
+                    </div>
+                    <div>
+                      <strong>篇幅:</strong> {synopsis.length}
+                    </div>
                   </div>
-                </div>
-                <div className="mt-4 flex space-x-2">
-                  <Button size="sm" className="flex-1">
-                    选择此梗概
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    编辑
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="mt-4 flex space-x-2">
+                    <Button size="sm" className="flex-1">
+                      选择此梗概
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      编辑
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <FileText className="h-16 w-16 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">暂无故事梗概</h3>
+            <p className="text-gray-600 mb-4">请先完成创意输入，然后生成故事梗概</p>
+            <Button variant="outline">
+              返回创意输入
+            </Button>
+          </div>
+        )}
 
         {/* Generation Controls */}
         <Card className="mb-8">
@@ -1292,13 +1230,8 @@ function OutlineCreation() {
 }
 
 function ChapterPlanning() {
-  const chapters = [
-    { id: 1, title: "新人守护者", status: "planned", words: 0, target: 3000 },
-    { id: 2, title: "异常波动", status: "planned", words: 0, target: 3500 },
-    { id: 3, title: "时空裂缝", status: "planned", words: 0, target: 4000 },
-    { id: 4, title: "修仙世界", status: "planned", words: 0, target: 3800 },
-    { id: 5, title: "力量觉醒", status: "planned", words: 0, target: 4200 },
-  ]
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   return (
     <div className="h-full p-8 overflow-y-auto">
@@ -1323,43 +1256,54 @@ function ChapterPlanning() {
                 <CardDescription>共5章，预计18,500字</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {chapters.map((chapter) => (
-                    <div key={chapter.id} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium">
-                          第{chapter.id}章：{chapter.title}
-                        </h3>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={chapter.status === "completed" ? "default" : "secondary"}>
-                            {chapter.status === "completed" ? "已完成" : "待写作"}
-                          </Badge>
-                          <Button size="sm" variant="ghost">
-                            <Edit3 className="h-4 w-4" />
-                          </Button>
+                {chapters.length > 0 ? (
+                  <div className="space-y-4">
+                    {chapters.map((chapter) => (
+                      <div key={chapter.id} className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium">
+                            第{chapter.id}章：{chapter.title}
+                          </h3>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant={chapter.status === "completed" ? "default" : "secondary"}>
+                              {chapter.status === "completed" ? "已完成" : "待写作"}
+                            </Badge>
+                            <Button size="sm" variant="ghost">
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600 mb-3">
+                          <p>{chapter.description || "暂无章节描述"}</p>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="text-gray-500">目标字数: {chapter.target?.toLocaleString() || 0} 字</div>
+                          <div className="text-gray-500">
+                            当前进度: {chapter.words || 0}/{chapter.target || 0} (
+                            {Math.round(((chapter.words || 0) / (chapter.target || 1)) * 100)}%)
+                          </div>
+                        </div>
+                        <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full"
+                            style={{ width: `${Math.round(((chapter.words || 0) / (chapter.target || 1)) * 100)}%` }}
+                          ></div>
                         </div>
                       </div>
-                      <div className="text-sm text-gray-600 mb-3">
-                        <p>
-                          林晨作为时空管理局的新人守护者，开始他的第一天工作。通过日常巡查展现未来世界的科技设定，为后续的冒险做铺垫。重点描写时空管理局的工作环境和林晨的性格特点。
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="text-gray-500">目标字数: {chapter.target.toLocaleString()} 字</div>
-                        <div className="text-gray-500">
-                          当前进度: {chapter.words}/{chapter.target} (
-                          {Math.round((chapter.words / chapter.target) * 100)}%)
-                        </div>
-                      </div>
-                      <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full"
-                          style={{ width: `${Math.round((chapter.words / chapter.target) * 100)}%` }}
-                        ></div>
-                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-gray-400 mb-4">
+                      <List className="h-16 w-16 mx-auto" />
                     </div>
-                  ))}
-                </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">暂无章节规划</h3>
+                    <p className="text-gray-600 mb-4">请先完成大纲制作，然后生成章节规划</p>
+                    <Button variant="outline">
+                      返回大纲制作
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
